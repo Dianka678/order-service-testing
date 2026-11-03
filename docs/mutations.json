@@ -1,0 +1,175 @@
+[
+  {
+    "mutation": "discount_boundary_10",
+    "file": "app/pricing.py",
+    "before": "quantity >= 10",
+    "after": "quantity > 10",
+    "killed": true,
+    "failed_tests": [
+      "tests.test_order_service::test_order_total_includes_volume_discount[10-9.41]",
+      "tests.test_pricing::test_volume_discount_boundaries[10-5]",
+      "tests.test_pricing::test_total[100.00-10-950.00]",
+      "tests.test_pricing::test_total[0.99-10-9.41]"
+    ]
+  },
+  {
+    "mutation": "discount_boundary_50",
+    "file": "app/pricing.py",
+    "before": "quantity >= 50",
+    "after": "quantity > 50",
+    "killed": true,
+    "failed_tests": [
+      "tests.test_order_service::test_order_total_includes_volume_discount[50-44.55]",
+      "tests.test_pricing::test_volume_discount_boundaries[50-10]",
+      "tests.test_pricing::test_total[100.00-50-4500.00]",
+      "tests.test_pricing::test_total[0.99-50-44.55]"
+    ]
+  },
+  {
+    "mutation": "rounding_half_even",
+    "file": "app/pricing.py",
+    "before": "ROUND_HALF_UP",
+    "after": "ROUND_HALF_EVEN",
+    "killed": true,
+    "failed_tests": [
+      "tests.test_order_service::test_order_total_includes_volume_discount[10-9.41]",
+      "tests.test_pricing::test_discount_rounds_half_up[9.90-5-9.41]",
+      "tests.test_pricing::test_discount_rounds_half_up[0.01-50-0.01]",
+      "tests.test_pricing::test_discount_rounds_half_up[1.005-0-1.01]",
+      "tests.test_pricing::test_total[0.99-10-9.41]"
+    ]
+  },
+  {
+    "mutation": "full_stock_rejected",
+    "file": "app/service.py",
+    "before": "product.stock < quantity",
+    "after": "product.stock <= quantity",
+    "killed": true,
+    "failed_tests": [
+      "tests.test_order_service::test_order_can_use_entire_stock",
+      "tests.test_order_service::test_order_total_includes_volume_discount[100-89.10]"
+    ]
+  },
+  {
+    "mutation": "order_not_saved",
+    "file": "app/service.py",
+    "before": "self._orders.add(Order(None, user_id, product_id, quantity, total))",
+    "after": "Order(1, user_id, product_id, quantity, total)",
+    "killed": true,
+    "failed_tests": [
+      "tests.test_idempotency::test_same_request_returns_original_order_and_notifies_once[request-1]",
+      "tests.test_idempotency::test_same_request_returns_original_order_and_notifies_once[]",
+      "tests.test_idempotency::test_distinct_requests_create_distinct_orders[request_ids0]",
+      "tests.test_idempotency::test_distinct_requests_create_distinct_orders[request_ids1]",
+      "tests.test_idempotency::test_failed_attempt_is_not_cached[7-6-OutOfStock]",
+      "tests.test_idempotency::test_failed_attempt_is_not_cached[999-1-ProductNotFound]",
+      "tests.test_idempotency::test_failed_attempt_is_not_cached[7-0-InvalidQuantity]",
+      "tests.test_idempotency::test_retry_after_restock_uses_same_request_id",
+      "tests.test_idempotency::test_repository_failure_is_not_cached",
+      "tests.test_idempotency::test_notification_failure_does_not_create_duplicate",
+      "tests.test_idempotency::test_services_do_not_share_request_cache",
+      "tests.test_notifications::test_failing_notifier_keeps_saved_order",
+      "tests.test_notifications::test_mock_notifier_failure_does_not_escape[error0]",
+      "tests.test_notifications::test_mock_notifier_failure_does_not_escape[error1]",
+      "tests.test_notifications::test_mock_notifier_failure_does_not_escape[error2]",
+      "tests.test_notifications::test_repository_failure_is_propagated_without_notification",
+      "tests.test_notifications::test_notification_happens_after_persistence",
+      "tests.test_order_repository::test_service_works_with_sqlite",
+      "tests.test_order_service::test_successful_order_is_saved",
+      "tests.test_order_service::test_order_can_use_entire_stock",
+      "tests.test_order_service::test_order_total_includes_volume_discount[1-0.99]",
+      "tests.test_order_service::test_order_total_includes_volume_discount[9-8.91]",
+      "tests.test_order_service::test_order_total_includes_volume_discount[10-9.41]",
+      "tests.test_order_service::test_order_total_includes_volume_discount[49-46.08]",
+      "tests.test_order_service::test_order_total_includes_volume_discount[50-44.55]",
+      "tests.test_order_service::test_order_total_includes_volume_discount[100-89.10]",
+      "tests.test_order_service::test_consecutive_orders_get_different_ids"
+    ]
+  },
+  {
+    "mutation": "wrong_notification_recipient",
+    "file": "app/service.py",
+    "before": "self._notifier.send(order.user_id, text)",
+    "after": "self._notifier.send(order.product_id, text)",
+    "killed": true,
+    "failed_tests": [
+      "tests.test_notifications::test_notification_sent_once_after_success",
+      "tests.test_notifications::test_mock_notifier_failure_does_not_escape[error0]",
+      "tests.test_notifications::test_mock_notifier_failure_does_not_escape[error1]",
+      "tests.test_notifications::test_mock_notifier_failure_does_not_escape[error2]",
+      "tests.test_notifications::test_notification_happens_after_persistence",
+      "tests.test_order_repository::test_service_works_with_sqlite"
+    ]
+  },
+  {
+    "mutation": "duplicate_notification",
+    "file": "app/service.py",
+    "before": "        self._notify(order, product)\n",
+    "after": "        self._notify(order, product)\n        self._notify(order, product)\n",
+    "killed": true,
+    "failed_tests": [
+      "tests.test_idempotency::test_same_request_returns_original_order_and_notifies_once[request-1]",
+      "tests.test_idempotency::test_same_request_returns_original_order_and_notifies_once[]",
+      "tests.test_idempotency::test_distinct_requests_create_distinct_orders[request_ids0]",
+      "tests.test_idempotency::test_distinct_requests_create_distinct_orders[request_ids1]",
+      "tests.test_idempotency::test_failed_attempt_is_not_cached[7-6-OutOfStock]",
+      "tests.test_idempotency::test_failed_attempt_is_not_cached[999-1-ProductNotFound]",
+      "tests.test_idempotency::test_failed_attempt_is_not_cached[7-0-InvalidQuantity]",
+      "tests.test_idempotency::test_retry_after_restock_uses_same_request_id",
+      "tests.test_idempotency::test_repository_failure_is_not_cached",
+      "tests.test_idempotency::test_notification_failure_does_not_create_duplicate",
+      "tests.test_notifications::test_notification_sent_once_after_success",
+      "tests.test_notifications::test_mock_notifier_failure_does_not_escape[error0]",
+      "tests.test_notifications::test_mock_notifier_failure_does_not_escape[error1]",
+      "tests.test_notifications::test_mock_notifier_failure_does_not_escape[error2]",
+      "tests.test_notifications::test_notification_happens_after_persistence",
+      "tests.test_order_repository::test_service_works_with_sqlite"
+    ]
+  },
+  {
+    "mutation": "notification_error_escapes",
+    "file": "app/service.py",
+    "before": "        except Exception:\n",
+    "after": "        except Exception:\n            raise\n",
+    "killed": true,
+    "failed_tests": [
+      "tests.test_idempotency::test_notification_failure_does_not_create_duplicate",
+      "tests.test_idempotency::test_services_do_not_share_request_cache",
+      "tests.test_notifications::test_failing_notifier_keeps_saved_order",
+      "tests.test_notifications::test_mock_notifier_failure_does_not_escape[error0]",
+      "tests.test_notifications::test_mock_notifier_failure_does_not_escape[error1]",
+      "tests.test_notifications::test_mock_notifier_failure_does_not_escape[error2]"
+    ]
+  },
+  {
+    "mutation": "missing_user_filter",
+    "file": "app/sqlite_repo.py",
+    "before": "WHERE user_id = ? ORDER BY id",
+    "after": "WHERE ? IS NOT NULL ORDER BY id",
+    "killed": true,
+    "failed_tests": [
+      "tests.test_order_repository::test_list_filters_user_and_sorts_by_id[sqlite]"
+    ]
+  },
+  {
+    "mutation": "reversed_order",
+    "file": "app/sqlite_repo.py",
+    "before": "ORDER BY id\"",
+    "after": "ORDER BY id DESC\"",
+    "killed": true,
+    "failed_tests": [
+      "tests.test_order_repository::test_list_filters_user_and_sorts_by_id[sqlite]"
+    ]
+  },
+  {
+    "mutation": "missing_quantity_constraint",
+    "file": "app/sqlite_repo.py",
+    "before": " CHECK (quantity > 0)",
+    "after": "",
+    "killed": true,
+    "failed_tests": [
+      "tests.test_order_repository::test_sqlite_rejects_nonpositive_quantity[0]",
+      "tests.test_order_repository::test_sqlite_rejects_nonpositive_quantity[-1]"
+    ]
+  }
+]

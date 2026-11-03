@@ -1,69 +1,49 @@
-"""Тестовые двойники (ШАГИ 2-3). Всё, что нужно сервису, но без базы и без настоящей отправки.
-
-Эти классы должны подходить под контракты из app/ports.py, но НЕ наследуются от них.
-"""
-
-from __future__ import annotations
-
 from dataclasses import replace
 
 from app.models import Order, Product
 
 
 class FakeProductRepository:
-    """Fake: товары лежат в словаре. Пример готов — используйте как образец."""
-
     def __init__(self, *products: Product) -> None:
-        self._items = {p.id: p for p in products}
+        self._items = {product.id: product for product in products}
 
     def get(self, product_id: int) -> Product | None:
         return self._items.get(product_id)
 
 
 class FakeOrderRepository:
-    """Fake заказов (шаг 2). Присваивает id 1, 2, 3, … — как это делает база.
-
-    TODO: реализуйте add / get / list_for_user.
-    Подсказка: dataclasses.replace(order, id=...) создаёт копию заказа с новым id;
-    список для пользователя — в порядке возрастания id.
-    Добавьте также свойство/метод, возвращающее все сохранённые заказы: оно пригодится в проверках.
-    """
-
     def __init__(self) -> None:
         self._items: dict[int, Order] = {}
 
     def add(self, order: Order) -> Order:
-        raise NotImplementedError  # TODO
+        saved = replace(order, id=len(self._items) + 1)
+        self._items[saved.id] = saved
+        return saved
 
     def get(self, order_id: int) -> Order | None:
-        raise NotImplementedError  # TODO
+        return self._items.get(order_id)
 
     def list_for_user(self, user_id: int) -> list[Order]:
-        raise NotImplementedError  # TODO
+        return [order for order in self.all if order.user_id == user_id]
+
+    @property
+    def all(self) -> list[Order]:
+        return [self._items[key] for key in sorted(self._items)]
 
 
 class NotifierSpy:
-    """Spy (шаг 3): запоминает, что и кому «отправили», вместо настоящей отправки.
-
-    TODO: в send добавляйте (user_id, text) в список self.messages.
-    """
-
     def __init__(self) -> None:
         self.messages: list[tuple[int, str]] = []
 
     def send(self, user_id: int, text: str) -> None:
-        raise NotImplementedError  # TODO
+        self.messages.append((user_id, text))
 
 
 class FailingNotifier:
-    """Stub (шаг 3): уведомление не доходит. TODO: send должен бросать исключение (например, TimeoutError)."""
-
     def send(self, user_id: int, text: str) -> None:
-        raise NotImplementedError  # TODO
+        raise TimeoutError("Нет ответа от уведомителя")
 
 
 class BrokenOrderRepository(FakeOrderRepository):
-    """Хранилище заказов, которое «падает» при сохранении (шаг 3). TODO: add бросает ConnectionError."""
-
     def add(self, order: Order) -> Order:
-        raise NotImplementedError  # TODO
+        raise ConnectionError("Хранилище недоступно")

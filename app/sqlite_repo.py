@@ -1,13 +1,9 @@
-"""Репозиторий заказов на SQLite. ШАГ 4 практики."""
-
-from __future__ import annotations
-
 import sqlite3
-from decimal import Decimal  # noqa: F401
+from dataclasses import replace
+from decimal import Decimal
 
-from app.models import Order  # noqa: F401
+from app.models import Order
 
-# Схема уже готова — менять не нужно. Сумма хранится ТЕКСТОМ, чтобы не потерять копейки.
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS orders (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,35 +23,29 @@ def init_schema(conn: sqlite3.Connection) -> None:
 
 
 def _to_order(row: tuple) -> Order:
-    """Превратить строку (id, user_id, product_id, quantity, total) в Order.
-
-    total в базе — текст: превратите его в Decimal.
-    """
-    # TODO (шаг 4)
-    raise NotImplementedError
+    return Order(row[0], row[1], row[2], row[3], Decimal(row[4]))
 
 
 class SqliteOrderRepository:
-    """Те же методы, что и у порта OrderRepository (см. app/ports.py)."""
-
     def __init__(self, conn: sqlite3.Connection) -> None:
         self._conn = conn
 
     def add(self, order: Order) -> Order:
-        """INSERT без id; вернуть копию заказа с id = cursor.lastrowid.
-
-        Подсказки: dataclasses.replace(order, id=...), str(order.total), conn.commit().
-        Всегда используйте параметры `?`, а не f-строки в SQL.
-        """
-        # TODO (шаг 4)
-        raise NotImplementedError
+        with self._conn:
+            cursor = self._conn.execute(
+                "INSERT INTO orders (user_id, product_id, quantity, total) VALUES (?, ?, ?, ?)",
+                (order.user_id, order.product_id, order.quantity, str(order.total)),
+            )
+        return replace(order, id=cursor.lastrowid)
 
     def get(self, order_id: int) -> Order | None:
-        """SELECT по id; None, если строки нет."""
-        # TODO (шаг 4)
-        raise NotImplementedError
+        row = self._conn.execute(
+            f"SELECT {_COLUMNS} FROM orders WHERE id = ?", (order_id,)
+        ).fetchone()
+        return None if row is None else _to_order(row)
 
     def list_for_user(self, user_id: int) -> list[Order]:
-        """Заказы пользователя, отсортированные по id по возрастанию."""
-        # TODO (шаг 4)
-        raise NotImplementedError
+        rows = self._conn.execute(
+            f"SELECT {_COLUMNS} FROM orders WHERE user_id = ? ORDER BY id", (user_id,)
+        ).fetchall()
+        return [_to_order(row) for row in rows]
