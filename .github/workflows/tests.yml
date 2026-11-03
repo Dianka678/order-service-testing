@@ -1,0 +1,69 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Run tests and measure branch coverage
+        run: python -m pytest tests spec --cov=app --cov-branch --cov-fail-under=90 --cov-report=term-missing --cov-report=html --cov-report=xml --alluredir=allure-results
+      - name: Generate reports and screenshots
+        if: always() && matrix.python-version == '3.12'
+        run: |
+          python -m pip install playwright==1.64.1
+          python -m playwright install --with-deps chromium
+          npm install --global allure-commandline@2.46.1
+          allure generate allure-results --clean -o allure-report
+          python tools/capture_reports.py
+      - name: Check project structure
+        run: python tools/self_check.py
+      - name: Upload report screenshots
+        if: always() && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-screenshots
+          path: |
+            docs/allure.png
+            docs/coverage.png
+          if-no-files-found: error
+      - name: Upload rendered Allure report
+        if: always() && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report
+          path: allure-report/
+          if-no-files-found: warn
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-python-${{ matrix.python-version }}
+          path: |
+            htmlcov/
+            coverage.xml
+          if-no-files-found: warn
+      - name: Upload Allure results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-python-${{ matrix.python-version }}
+          path: allure-results/
+          if-no-files-found: warn

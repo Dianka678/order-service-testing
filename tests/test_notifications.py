@@ -1,31 +1,79 @@
-"""ШАГ 3. Уведомления и ошибки зависимостей.
-
-ЧТО НАПИСАТЬ (минимум):
-  - после успешного заказа отправлено РОВНО ОДНО сообщение; получатель — тот user_id, что передали;
-    текст содержит номер заказа и сумму.  Подсказка: возьмите user_id, отличный от product_id!
-  - при ProductNotFound и при OutOfStock (параметризация) сообщений нет
-  - уведомитель падает (FailingNotifier): place_order всё равно возвращает заказ, заказ сохранён
-  - то же самое через unittest.mock: Mock(spec=Notifier) + send.side_effect = TimeoutError(...)
-  - репозиторий заказов падает (BrokenOrderRepository): исключение уходит наружу, сообщений нет
-
-Не забудьте пометить файл маркером:  pytestmark = pytest.mark.unit  (после импортов).
-"""
-
-from unittest.mock import Mock  # noqa: F401
+import logging
+from unittest.mock import Mock
 
 import pytest
 
-from app.errors import OutOfStock, ProductNotFound  # noqa: F401
-from app.ports import Notifier  # noqa: F401
-from app.service import OrderService  # noqa: F401
-from tests.fakes import BrokenOrderRepository, FailingNotifier  # noqa: F401
+from app.errors import InvalidQuantity, OutOfStock, ProductNotFound
+from app.ports import Notifier
+from app.service import OrderService
+from tests.fakes import BrokenOrderRepository, FailingNotifier
+
+pytestmark = pytest.mark.unit
 
 
 def test_notification_sent_once_after_success(service, notifier, phone):
-    service.place_order(user_id=42, product_id=phone.id, quantity=3)
-
+    service.place_order(user_id=65, product_id=phone.id, quantity=1)
+    notifier.messages.clear()
+    order = service.place_order(user_id=42, product_id=phone.id, quantity=3)
     assert len(notifier.messages) == 1
-    # TODO: проверьте получателя и содержимое текста
+    user_id, text = notifier.messages[0]
+    assert user_id == 42
+    assert str(order.id) in text
+    assert str(order.total) in text
 
 
-# TODO: остальные тесты по списку выше
+@pytest.mark.parametrize(
+    "product_id, quantity, error",
+    [(999, 1, ProductNotFound), (7, 6, OutOfStock), (7, 0, InvalidQuantity), (7, -1, InvalidQuantity)],
+)
+def test_failed_orders_do_not_notify(service, notifier, orders, product_id, quantity, error):
+    with pytest.raises(error):
+        service.place_order(user_id=42, product_id=product_id, quantity=quantity)
+    assert notifier.messages == []
+    assert orders.all == []
+
+
+def test_failing_notifier_keeps_saved_order(products, orders, phone, caplog):
+    service = OrderService(products, orders, FailingNotifier())
+    with caplog.at_level(logging.WARNING):
+        order = service.place_order(user_id=42, product_id=phone.id, quantity=2)
+    assert orders.get(order.id) == order
+    assert len(orders.all) == 1
+    assert any(record.levelno >= logging.WARNING for record in caplog.records)
+
+
+@pytest.mark.parametrize("error", [TimeoutError("Таймаут"), RuntimeError("Ошибка отправки"), ValueError("Ошибка данных")])
+def test_mock_notifier_failure_does_not_escape(products, orders, phone, error):
+    notifier = Mock(spec=Notifier)
+    notifier.send.side_effect = error
+    service = OrderService(products, orders, notifier)
+    order = service.place_order(user_id=42, product_id=phone.id, quantity=2)
+    assert orders.get(order.id) == order
+    notifier.send.assert_called_once()
+    recipient, text = notifier.send.call_args.args
+    assert recipient == 42
+    assert str(order.id) in text
+    assert str(order.total) in text
+
+
+def test_repository_failure_is_propagated_without_notification(products, notifier, phone):
+    orders = BrokenOrderRepository()
+    service = OrderService(products, orders, notifier)
+    with pytest.raises(ConnectionError):
+        service.place_order(user_id=42, product_id=phone.id, quantity=1)
+    assert orders.all == []
+    assert notifier.messages == []
+
+
+def test_notification_happens_after_persistence(products, orders, phone):
+    notifier = Mock(spec=Notifier)
+    observed = []
+
+    def observe(user_id, text):
+        observed.append((user_id, orders.list_for_user(user_id)))
+
+    notifier.send.side_effect = observe
+    service = OrderService(products, orders, notifier)
+    order = service.place_order(user_id=42, product_id=phone.id, quantity=1)
+    assert observed == [(42, [order])]
+    notifier.send.assert_called_once()
